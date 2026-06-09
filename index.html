@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bnovicio ~ portfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #002b36;
+    --bg2:      #073642;
+    --bg3:      #083f4d;
+    --base0:    #839496;
+    --base1:    #93a1a1;
+    --base2:    #eee8d5;
+    --base3:    #fdf6e3;
+    --blue:     #268bd2;
+    --cyan:     #2aa198;
+    --green:    #859900;
+    --yellow:   #b58900;
+    --orange:   #cb4b16;
+    --red:      #dc322f;
+    --magenta:  #d33682;
+    --violet:   #6c71c4;
+    --prompt-user: #268bd2;
+    --prompt-host: #2aa198;
+    --prompt-path: #859900;
+    --prompt-sym:  #b58900;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--base1);
+    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 14px;
+    line-height: 1.7;
+    min-height: 100vh;
+  }
+
+  /* ── scanline overlay ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.06) 2px,
+      rgba(0,0,0,0.06) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  .terminal {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  /* ── window chrome ── */
+  .window-bar {
+    background: var(--bg2);
+    border-radius: 10px 10px 0 0;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid rgba(0,0,0,0.3);
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot-red    { background: #ff5f57; }
+  .dot-yellow { background: #febc2e; }
+  .dot-green  { background: #28c840; }
+  .window-title {
+    flex: 1;
+    text-align: center;
+    font-size: 12px;
+    color: var(--base0);
+    letter-spacing: 0.04em;
+  }
+
+  .window-body {
+    background: var(--bg);
+    border-radius: 0 0 10px 10px;
+    padding: 1.5rem 1.75rem 2.5rem;
+    border: 1px solid var(--bg3);
+    border-top: none;
+  }
+
+  /* ── navigation tabs ── */
+  .nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid var(--bg3);
+    padding-bottom: 0.75rem;
+  }
+  .nav-cmd {
+    background: none;
+    border: 1px solid transparent;
+    color: var(--base0);
+    font-family: inherit;
+    font-size: 13px;
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .nav-cmd:hover { border-color: var(--blue); color: var(--blue); }
+  .nav-cmd.active {
+    border-color: var(--blue);
+    background: rgba(38,139,210,0.1);
+    color: var(--blue);
+  }
+
+  /* ── prompt line ── */
+  .prompt {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+  }
+  .p-user   { color: var(--prompt-user); font-weight: 700; }
+  .p-at     { color: var(--base0); }
+  .p-host   { color: var(--prompt-host); font-weight: 700; }
+  .p-colon  { color: var(--base0); }
+  .p-path   { color: var(--prompt-path); }
+  .p-sym    { color: var(--prompt-sym); margin: 0 6px 0 4px; }
+  .p-cmd    { color: var(--base2); }
+
+  /* ── sections ── */
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* ── output blocks ── */
+  .output { margin-left: 0; padding: 0.25rem 0 1.5rem; }
+
+  .comment { color: var(--base0); font-style: italic; }
+
+  .kv { display: flex; gap: 1rem; margin: 0.2rem 0; flex-wrap: wrap; }
+  .kv .key   { color: var(--cyan); min-width: 120px; flex-shrink: 0; }
+  .kv .val   { color: var(--base2); }
+
+  .tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 0.5rem 0; }
+  .tag {
+    background: rgba(38,139,210,0.12);
+    border: 1px solid rgba(38,139,210,0.3);
+    color: var(--blue);
+    font-size: 12px;
+    padding: 2px 10px;
+    border-radius: 3px;
+  }
+  .tag.cyan   { background: rgba(42,161,152,0.12); border-color: rgba(42,161,152,0.3); color: var(--cyan); }
+  .tag.green  { background: rgba(133,153,0,0.12);  border-color: rgba(133,153,0,0.3);  color: var(--green); }
+  .tag.violet { background: rgba(108,113,196,0.12);border-color: rgba(108,113,196,0.3);color: var(--violet); }
+  .tag.yellow { background: rgba(181,137,0,0.12);  border-color: rgba(181,137,0,0.3);  color: var(--yellow); }
+  .tag.orange { background: rgba(203,75,22,0.12);  border-color: rgba(203,75,22,0.3);  color: var(--orange); }
+
+  /* ── job entries ── */
+  .job { margin-bottom: 2rem; }
+  .job-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-bottom: 0.25rem;
+  }
+  .job-company { color: var(--yellow); font-weight: 700; font-size: 15px; }
+  .job-period  { color: var(--base0); font-size: 12px; }
+  .job-title   { color: var(--cyan); margin-bottom: 0.75rem; font-size: 13px; }
+  .job-bullets { list-style: none; padding: 0; }
+  .job-bullets li { 
+    color: var(--base1); 
+    padding-left: 1.25rem; 
+    position: relative; 
+    margin-bottom: 0.35rem; 
+    font-size: 13px;
+  }
+  .job-bullets li::before { content: '▸'; position: absolute; left: 0; color: var(--blue); }
+
+  /* ── skill groups ── */
+  .skill-group { margin-bottom: 1.25rem; }
+  .skill-label { color: var(--cyan); margin-bottom: 0.4rem; font-size: 13px; }
+
+  /* ── project card ── */
+  .project-card {
+    border: 1px solid var(--bg3);
+    border-left: 3px solid var(--blue);
+    background: var(--bg2);
+    padding: 1rem 1.25rem;
+    border-radius: 0 6px 6px 0;
+    margin-bottom: 1.5rem;
+  }
+  .project-name { color: var(--blue); font-size: 15px; font-weight: 700; margin-bottom: 0.25rem; }
+  .project-desc { color: var(--base1); font-size: 13px; margin-bottom: 0.75rem; line-height: 1.6; }
+  .project-status {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: rgba(181,137,0,0.15);
+    border: 1px solid rgba(181,137,0,0.35);
+    color: var(--yellow);
+    margin-bottom: 0.75rem;
+  }
+
+  /* ── contact ── */
+  .contact-line { 
+    display: flex; 
+    align-items: center; 
+    gap: 0.75rem; 
+    margin: 0.5rem 0; 
+    font-size: 13px;
+  }
+  .contact-line .icon { color: var(--blue); width: 90px; flex-shrink: 0; }
+  .contact-line a { color: var(--cyan); text-decoration: none; }
+  .contact-line a:hover { color: var(--base2); text-decoration: underline; }
+
+  /* ── divider ── */
+  .div-line { 
+    border: none; 
+    border-top: 1px solid var(--bg3); 
+    margin: 1.5rem 0; 
+  }
+
+  /* ── cursor blink ── */
+  .cursor {
+    display: inline-block;
+    width: 8px;
+    height: 14px;
+    background: var(--blue);
+    vertical-align: middle;
+    animation: blink 1.1s step-end infinite;
+    margin-left: 2px;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  /* ── boot sequence ── */
+  #boot {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--base0);
+    padding: 2rem;
+  }
+  .boot-lines { max-width: 500px; width: 100%; }
+  .boot-line { opacity: 0; margin-bottom: 3px; }
+  .boot-line.show { opacity: 1; }
+  .boot-ok   { color: var(--green); }
+  .boot-info { color: var(--blue); }
+
+  /* ── progress bar ── */
+  .progress-wrap { 
+    max-width: 500px; 
+    width: 100%; 
+    margin-top: 1rem; 
+    border: 1px solid var(--bg3); 
+    border-radius: 2px; 
+    height: 6px; 
+    overflow: hidden; 
+  }
+  .progress-bar { 
+    height: 100%; 
+    width: 0; 
+    background: var(--blue); 
+    transition: width 0.1s linear; 
+    border-radius: 2px; 
+  }
+
+  /* ── responsive ── */
+  @media (max-width: 600px) {
+    .terminal { padding: 0.75rem 0.5rem 3rem; }
+    .window-body { padding: 1rem; }
+    .job-header { flex-direction: column; }
+    .kv { flex-direction: column; gap: 0.1rem; }
+    .kv .key { min-width: auto; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cursor { animation: none; opacity: 1; }
+    body::before { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- boot screen -->
+<div id="boot">
+  <div class="boot-lines" id="boot-lines"></div>
+  <div class="progress-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+</div>
+
+<div class="terminal" id="main" style="display:none">
+  <!-- window chrome -->
+  <div class="window-bar">
+    <span class="dot dot-red"></span>
+    <span class="dot dot-yellow"></span>
+    <span class="dot dot-green"></span>
+    <span class="window-title">bnovicio@portfolio: ~</span>
+  </div>
+
+  <div class="window-body">
+
+    <!-- nav -->
+    <nav class="nav" role="navigation" aria-label="Terminal commands">
+      <button class="nav-cmd active" data-section="whoami">./whoami</button>
+      <button class="nav-cmd" data-section="experience">./experience</button>
+      <button class="nav-cmd" data-section="skills">./skills</button>
+      <button class="nav-cmd" data-section="projects">./projects</button>
+      <button class="nav-cmd" data-section="contact">./contact</button>
+    </nav>
+
+    <!-- ══ WHOAMI ══ -->
+    <section class="section active" id="whoami">
+      <div class="prompt">
+        <span class="p-user">bnovicio</span><span class="p-at">@</span><span class="p-host">portfolio</span><span class="p-colon">:</span><span class="p-path">~</span><span class="p-sym">$</span>
+        <span class="p-cmd">./whoami</span>
+      </div>
+      <div class="output">
+        <p class="comment"># mid-level software engineer · metro manila, ph</p>
+        <br>
+        <div class="kv"><span class="key">name</span><span class="val">bnovicio</span></div>
+        <div class="kv"><span class="key">role</span><span class="val">Software Engineer</span></div>
+        <div class="kv"><span class="key">location</span><span class="val">Metro Manila, Philippines</span></div>
+        <div class="kv"><span class="key">experience</span><span class="val">5+ years</span></div>
+        <div class="kv"><span class="key">focus</span><span class="val">Java · Spring Boot · Backend Automation · DevOps</span></div>
+        <br>
+        <p style="color:var(--base2); font-size:13px; max-width:620px; line-height:1.8;">
+          I’m a mid-level Software Engineer who likes building things that are clean, tested, and easy to hand off. 
+          Lately, I’ve been focusing on boosting system efficiency through DevOps, Playwright automation, and observability.
+          When I’m away from the keyboard, I’m usually tinkering with new tech, lifting, training Muay Thai, or playing Street Fighter 6.
+        </p>
+      </div>
+    </section>
+
+    <!-- ══ EXPERIENCE ══ -->
+    <section class="section" id="experience">
+      <div class="prompt">
+        <span class="p-user">bnovicio</span><span class="p-at">@</span><span class="p-host">portfolio</span><span class="p-colon">:</span><span class="p-path">~</span><span class="p-sym">$</span>
+        <span class="p-cmd">./experience</span>
+      </div>
+      <div class="output">
+        <p class="comment"># work history · 3 entries found</p>
+        <br>
+
+        <div class="job">
+          <div class="job-header">
+            <span class="job-company">ORACLE</span>
+            <span class="job-period">Aug 2025 – Present · Makati City, PH</span>
+          </div>
+          <div class="job-title">▸ Software Engineer</div>
+          <ul class="job-bullets">
+            <li>Spearheaded internal advocacy, presentation, and training of Playwright Test frameworks across multiple business units to champion automated QA best practices.</li>
+            <li>Engineered integration and validation pipelines for Oracle Retail Cloud Services, developing automated scripts to detect, isolate, and resolve critical data anomalies during high-stakes legacy system migrations.</li>
+            <li>Optimized complex database queries and drove cross-team code reviews, improving data pipeline throughput and maintaining strict backend system reliability.</li>
+          </ul>
+        </div>
+
+        <hr class="div-line">
+
+        <div class="job">
+          <div class="job-header">
+            <span class="job-company">MACQUARIE GROUP</span>
+            <span class="job-period">Jun 2024 – Aug 2025 · Makati City, PH</span>
+          </div>
+          <div class="job-title">▸ Senior Associate – Fullstack Engineer</div>
+          <ul class="job-bullets">
+            <li>Introduced and implemented system observability across internal services by integrating Grafana, providing the team with real-time health metrics.</li>
+            <li>Architected and built automated E2E testing suites using Playwright, significantly reducing manual verification cycles during DevOps deployments.</li>
+            <li>Interfaced directly with international stakeholders to translate complex business requirements into technical implementations.</li>
+            <li>Refactored critical core services to resolve high-priority architectural bottlenecks, improving system efficiency and processing speeds by 85%.</li>
+          </ul>
+        </div>
+
+        <hr class="div-line">
+
+        <div class="job">
+          <div class="job-header">
+            <span class="job-company">CAMBRIDGE UNIVERSITY PRESS &amp; ASSESSMENT</span>
+            <span class="job-period">Dec 2020 – Jun 2024 · Makati City, PH</span>
+          </div>
+          <div class="job-title">▸ Junior Software Engineer</div>
+          <ul class="job-bullets">
+            <li>Migrated legacy applications to Cambridge Core, significantly reducing database overhead costs through structural schema optimization.</li>
+            <li>Enhanced API logic for content management, job scheduling, and high-velocity background automation.</li>
+            <li>Maintained platform security integrity through monthly penetration testing and remediation.</li>
+            <li>Eliminated manual internal workflows by developing custom data-processing scripts and automated background workers via batch jobs.</li>
+          </ul>
+        </div>
+
+        <!-- <hr class="div-line">
+
+        <p class="comment"># education</p>
+        <br>
+        <div class="kv"><span class="key">institution</span><span class="val">Information and Communications Technology Academy</span></div>
+        <div class="kv"><span class="key">degree</span><span class="val">BS Computer Science · Specialization in Software Engineering</span></div>
+        <div class="kv"><span class="key">graduated</span><span class="val">September 2020 · Makati City, PH</span></div>
+        <div class="kv"><span class="key">coursework</span><span class="val">Enterprise Java Programming · Software QA · Software Design Patterns</span></div> -->
+      </div>
+    </section>
+
+    <!-- ══ SKILLS ══ -->
+    <section class="section" id="skills">
+      <div class="prompt">
+        <span class="p-user">bnovicio</span><span class="p-at">@</span><span class="p-host">portfolio</span><span class="p-colon">:</span><span class="p-path">~</span><span class="p-sym">$</span>
+        <span class="p-cmd">./skills</span>
+      </div>
+      <div class="output">
+        <p class="comment"># tools &amp; technologies · scanning inventory...</p>
+        <br>
+
+        <div class="skill-group">
+          <div class="skill-label">$ languages</div>
+          <div class="tag-list">
+            <span class="tag">Java</span>
+            <span class="tag">Groovy</span>
+            <span class="tag">JavaScript</span>
+            <span class="tag">TypeScript</span>
+            <span class="tag">PHP</span>
+            <span class="tag">Python</span>
+            <span class="tag">XML</span>
+          </div>
+        </div>
+
+        <div class="skill-group">
+          <div class="skill-label">$ frameworks &amp; libraries</div>
+          <div class="tag-list">
+            <span class="tag cyan">Spring Boot</span>
+            <span class="tag cyan">Playwright</span>
+            <span class="tag cyan">JUnit</span>
+            <span class="tag cyan">React</span>
+            <span class="tag cyan">Laravel</span>
+            <span class="tag cyan">Django</span>
+          </div>
+        </div>
+
+        <div class="skill-group">
+          <div class="skill-label">$ databases</div>
+          <div class="tag-list">
+            <span class="tag green">MySQL</span>
+            <span class="tag green">Oracle SQL</span>
+            <span class="tag green">PL/SQL</span>
+            <span class="tag green">Microsoft SQL Server</span>
+            <span class="tag green">MarkLogic Server</span>
+          </div>
+        </div>
+
+        <div class="skill-group">
+          <div class="skill-label">$ infrastructure &amp; tooling</div>
+          <div class="tag-list">
+            <span class="tag violet">Amazon Web Services</span>
+            <span class="tag violet">Docker</span>
+            <span class="tag violet">Grafana</span>
+            <span class="tag violet">IBM OpenPages</span>
+          </div>
+        </div>
+
+        <div class="skill-group">
+          <div class="skill-label">$ practices</div>
+          <div class="tag-list">
+            <span class="tag yellow">DevOps</span>
+            <span class="tag yellow">Test Automation</span>
+            <span class="tag yellow">Observability</span>
+            <span class="tag yellow">CI/CD</span>
+            <span class="tag yellow">Penetration Testing</span>
+            <span class="tag yellow">Code Review</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ PROJECTS ══ -->
+    <section class="section" id="projects">
+      <div class="prompt">
+        <span class="p-user">bnovicio</span><span class="p-at">@</span><span class="p-host">portfolio</span><span class="p-colon">:</span><span class="p-path">~</span><span class="p-sym">$</span>
+        <span class="p-cmd">./projects</span>
+      </div>
+      <div class="output">
+        <p class="comment"># personal projects · 1 entry found</p>
+        <br>
+
+        <div class="project-card">
+          <div class="project-name">Spendit</div>
+          <div class="project-desc">
+            An expense tracking web app built to streamline personal finance management.
+            Architected for clarity — log expenses, categorize spending, and surface where
+            money actually goes.
+          </div>
+          <div class="project-status">⟳ actively refactoring</div>
+          <br>
+          <div class="skill-label" style="font-size:12px; margin-bottom:0.35rem;">current stack</div>
+          <div class="tag-list">
+            <span class="tag cyan">Spring Boot</span>
+            <span class="tag green">MySQL</span>
+            <span class="tag">React</span>
+            <span class="tag orange">MaterialUI</span>
+          </div>
+        </div>
+
+        <p style="color:var(--base0); font-size:12px; margin-top:0.5rem;">
+          more projects coming soon — check back or <span style="color:var(--cyan)">./contact</span> me directly
+        </p>
+      </div>
+    </section>
+
+    <!-- ══ CONTACT ══ -->
+    <section class="section" id="contact">
+      <div class="prompt">
+        <span class="p-user">bnovicio</span><span class="p-at">@</span><span class="p-host">portfolio</span><span class="p-colon">:</span><span class="p-path">~</span><span class="p-sym">$</span>
+        <span class="p-cmd">./contact</span>
+      </div>
+      <div class="output">
+        <p class="comment"># reach out · open to opportunities</p>
+        <br>
+
+        <div class="contact-line">
+          <span class="icon">location</span>
+          <span style="color:var(--base1)">Metro Manila, Philippines</span>
+        </div>
+        <div class="contact-line">
+          <span class="icon">github</span>
+          <a href="https://github.com/bnovicio" target="_blank" rel="noopener">github.com/bnovicio</a>
+        </div>
+        <div class="contact-line">
+          <span class="icon">email</span>
+          <span style="color:var(--base1)">[redacted — update index.html]</span>
+        </div>
+        <div class="contact-line">
+          <span class="icon">phone</span>
+          <span style="color:var(--base1)">[redacted — update index.html]</span>
+        </div>
+
+        <br>
+        <p style="color:var(--base0); font-size:12px; line-height:1.8;">
+          best reached via github or email<br>
+          response time: <span style="color:var(--green)">usually within 24h</span>
+        </p>
+        <br>
+        <span class="cursor"></span>
+      </div>
+    </section>
+
+    <!-- ══ COMMAND LOG ══ -->
+    <div id="cmd-log" style="margin-top:1.5rem; font-size:13px; color:var(--base0);"></div>
+
+    <!-- ══ COMMAND INPUT ══ -->
+    <div style="display:flex; align-items:center; gap:0; margin-top:1rem; border-top:1px solid var(--bg3); padding-top:1rem;">
+      <span style="color:var(--prompt-user); font-weight:700;">bnovicio</span><span style="color:var(--base0);">@</span><span style="color:var(--prompt-host); font-weight:700;">portfolio</span><span style="color:var(--base0);">:</span><span style="color:var(--prompt-path);">~</span><span style="color:var(--prompt-sym); margin:0 6px 0 4px;">$</span>
+      <input
+        id="cmd-input"
+        type="text"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"
+        aria-label="Terminal command input"
+        placeholder="type a command and press Enter..."
+        style="
+          flex:1;
+          background:transparent;
+          border:none;
+          outline:none;
+          color:var(--base2);
+          font-family:inherit;
+          font-size:13px;
+          caret-color:var(--blue);
+        "
+      >
+    </div>
+
+  </div><!-- /window-body -->
+</div><!-- /terminal -->
+
+<script>
+const bootMessages = [
+  { text: 'BIOS v2.6.0  initializing...', cls: '', delay: 0 },
+  { text: 'checking memory.................. OK', cls: 'boot-ok', delay: 180 },
+  { text: 'loading kernel modules........... OK', cls: 'boot-ok', delay: 340 },
+  { text: 'mounting filesystems............. OK', cls: 'boot-ok', delay: 480 },
+  { text: 'starting portfolio daemon........ OK', cls: 'boot-ok', delay: 620 },
+  { text: 'fetching work history............ OK', cls: 'boot-ok', delay: 760 },
+  { text: 'indexing skills inventory........ OK', cls: 'boot-ok', delay: 900 },
+  { text: 'loading project manifests........ OK', cls: 'boot-ok', delay: 1040 },
+  { text: '', cls: '', delay: 1100 },
+  { text: 'welcome, traveller. bnovicio@portfolio:~', cls: 'boot-info', delay: 1180 },
+];
+
+const bootEl   = document.getElementById('boot-lines');
+const bar      = document.getElementById('progress-bar');
+const mainEl   = document.getElementById('main');
+
+bootMessages.forEach(({ text, cls, delay }, i) => {
+  setTimeout(() => {
+    const line = document.createElement('div');
+    line.className = 'boot-line show' + (cls ? ' ' + cls : '');
+    line.textContent = text;
+    bootEl.appendChild(line);
+    bar.style.width = ((i + 1) / bootMessages.length * 100) + '%';
+  }, delay);
+});
+
+setTimeout(() => {
+  const boot = document.getElementById('boot');
+  boot.style.transition = 'opacity 0.4s';
+  boot.style.opacity = '0';
+  setTimeout(() => {
+    boot.style.display = 'none';
+    mainEl.style.display = 'block';
+  }, 400);
+}, 1700);
+
+// nav tabs
+document.querySelectorAll('.nav-cmd').forEach(btn => {
+  btn.addEventListener('click', () => {
+    navigate(btn.dataset.section);
+  });
+});
+
+function navigate(section) {
+  document.querySelectorAll('.nav-cmd').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  const btn = document.querySelector(`.nav-cmd[data-section="${section}"]`);
+  if (btn) btn.classList.add('active');
+  const el = document.getElementById(section);
+  if (el) el.classList.add('active');
+}
+
+// command input
+const input   = document.getElementById('cmd-input');
+const cmdLog  = document.getElementById('cmd-log');
+
+const SECTIONS = ['whoami', 'experience', 'skills', 'projects', 'contact'];
+const COMMANDS = SECTIONS.map(s => './' + s).concat(['help', 'clear', 'ls']);
+
+const HELP_TEXT = `available commands:
+  ./whoami      — who am i
+  ./experience  — work history
+  ./skills      — tools &amp; technologies
+  ./projects    — personal projects
+  ./contact     — get in touch
+  ls            — list all commands
+  clear         — clear this log
+  help          — show this message`;
+
+let cmdHistory = [];
+let historyIdx = -1;
+
+function appendLog(cmdText, responseHTML) {
+  const entry = document.createElement('div');
+  entry.style.cssText = 'margin-bottom:0.75rem;';
+  entry.innerHTML = `
+    <div style="color:var(--base0); margin-bottom:2px;">
+      <span style="color:var(--prompt-user);font-weight:700;">bnovicio</span><span style="color:var(--base0);">@</span><span style="color:var(--prompt-host);font-weight:700;">portfolio</span><span style="color:var(--base0);">:</span><span style="color:var(--prompt-path);">~</span><span style="color:var(--prompt-sym);margin:0 6px 0 4px;">$</span><span style="color:var(--base2);">${cmdText}</span>
+    </div>
+    <div style="padding-left:0; color:var(--base1);">${responseHTML}</div>
+  `;
+  cmdLog.appendChild(entry);
+  entry.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function handleCommand(raw) {
+  const cmd = raw.trim().toLowerCase();
+  if (!cmd) return;
+
+  cmdHistory.unshift(raw.trim());
+  historyIdx = -1;
+
+  if (cmd === 'clear') {
+    cmdLog.innerHTML = '';
+    return;
+  }
+
+  if (cmd === 'help' || cmd === '--help') {
+    appendLog(raw.trim(), `<pre style="color:var(--base1);font-size:12px;line-height:1.8;">${HELP_TEXT}</pre>`);
+    return;
+  }
+
+  if (cmd === 'ls') {
+    const list = COMMANDS.map(c => `<span style="color:var(--blue);">${c}</span>`).join('  ');
+    appendLog(raw.trim(), list);
+    return;
+  }
+
+  const section = cmd.replace(/^\.\//, '');
+  if (SECTIONS.includes(section)) {
+    navigate(section);
+    appendLog(raw.trim(), `<span style="color:var(--green);">→ navigated to ${cmd}</span>`);
+    return;
+  }
+
+  // command not found
+  appendLog(
+    raw.trim(),
+    `<span style="color:var(--red);">bash: ${escHtml(raw.trim())}: command not found</span><br><span style="color:var(--base0);font-size:12px;">try <span style="color:var(--blue);">help</span> or <span style="color:var(--blue);">ls</span></span>`
+  );
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const val = input.value;
+    input.value = '';
+    handleCommand(val);
+  }
+
+  // history up/down
+  if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (historyIdx < cmdHistory.length - 1) {
+      historyIdx++;
+      input.value = cmdHistory[historyIdx];
+    }
+  }
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (historyIdx > 0) {
+      historyIdx--;
+      input.value = cmdHistory[historyIdx];
+    } else {
+      historyIdx = -1;
+      input.value = '';
+    }
+  }
+
+  // tab completion
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const partial = input.value.trim().toLowerCase();
+    if (!partial) return;
+    const match = COMMANDS.find(c => c.startsWith(partial));
+    if (match) input.value = match;
+  }
+});
+</script>
+</body>
+</html>
